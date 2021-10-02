@@ -13,67 +13,144 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             uiElem = ui;
             
             uiElem.input.addEventListener('keydown', this.addRow);
+            uiElem.tbody.addEventListener('click', this.deleteRow);
+            uiElem.sortBtnsWrap.addEventListener('click', this.btnHandler)
         }
 
         this.addRow = function(ev){
             moduleModel.addRow(ev);
         }
+
+        this.deleteRow = function(ev){
+            let target = ev.target;
+
+            if(target.tagName !== 'SPAN' || target.className !== 'del-btn') return;
+            ev.preventDefault();
+
+            let prt = target.closest('[data-ks-sort]').querySelector('[data-ks-sort-idx]');
+
+            moduleModel.deleteRow({idx:prt.dataset.ksSortIdx, text:prt.nextElementSibling.innerText});
+        }
+
+        this.btnHandler = function(ev){
+            moduleModel.btnHandler(ev);
+        }
     }
+
     function Model(){
         let moduleView = null;
-        let rows = [];
+        let rows = null;
+        let idx = 0;
 
         this.init = function(view){
             moduleView = view;
+            this.getRowsFromLocalStorage();
+            this.updateTable();
+        }
 
+        this.getRowsFromLocalStorage = function(){
+            rows = localStorage.rows?JSON.parse(localStorage.rows):[];
+        }
+
+        this.setRowsToLocalStorage = function(){
+            localStorage.rows = JSON.stringify(rows);
+        }
+
+        this.updateTable = function(){
+            moduleView.updateTable(rows);
+            this.setRowsToLocalStorage();
         }
         
         this.addRow = function(ev){
-            // 보류
-            // let rowForm = (row) => {
-            //     idx++;
-            //     return {
-            //         idx: idx,
-            //         row: row
-            //     }
-            // };
+            // 보류 - 채택
+            let rowForm = (row) => {
+                let max = 0;
+                rows.forEach(x=>{
+                    max = x.idx>max?x.idx:max;
+                });
+                return {idx: max+1, row: row, regdate: new Date().getTime()}
+            };
             let target = ev.target;
+
             if(ev.key === 'Enter'){
-                rows.push(target.value);
+                rows.push(rowForm(target.value));
                 moduleView.clearInput();
                 this.updateTable();
             }
         }
 
-        this.updateTable = function(){
+        this.deleteRow = function(row){
+            
+            rows = rows.filter(r=>r.idx!=row.idx);
+            this.updateTable();
+        }
+
+        this.btnHandler = function(ev){
+            let target = ev.target;
+            let text = target.innerText;
+
+            text = text.charAt().toUpperCase()+text.slice(1);
+            
+            if(target.className.indexOf('btns-')==-1 || target.tagName !== 'BUTTON') return;
+
+            ev.preventDefault();
+            eval(`this.align${text}(rows);`);
+        }
+
+        this.alignSort = function(rows){
+            for(let i in rows){
+                for(let q in rows){
+                    if(rows[i].idx < rows[q].idx){
+                        let tmp = rows[i];
+                        rows[i] = rows[q];
+                        rows[q] = tmp;
+                    }
+                }
+            }
+            this.updateTable(rows);
+        }
+
+        this.alignReverse = function(rows){
+            for(let i in rows){
+                for(let q in rows){
+                    if(rows[i].idx > rows[q].idx){
+                        let tmp = rows[i];
+                        rows[i] = rows[q];
+                        rows[q] = tmp;
+                    }
+                }
+            }
             moduleView.updateTable(rows);
         }
-
-        this.sortedRows = function(){
-
-        }
     }
+
     function View(){
         let uiElem = null;
 
         this.init = function(ui){
             uiElem = ui;
-            // console.log(uiElem)
         }
+
         this.updateTable = function(rows){
+            let reverse = false;
             let formedRows = '';
+            let id = 1;
+            if(rows[0].idx>rows[rows.length-1].idx){
+                reverse = true;
+                id = rows.length;
+            }
             let rowForm = row => `
                     <tr data-ks-sort="tr">
-                        <td data-ks-sort="index">${row.idx+1}</td>
+                        <td data-ks-sort="index" data-ks-sort-idx="${row.idx}">${reverse?id--:id++}</td>
                         <td>${row.row}</td>
                         <td><span class="del-btn">&times;</span></td>
                     </tr>
             `;
-            rows.forEach((row, idx)=>{
-                formedRows += rowForm({row, idx});
-            });
+
+            rows.forEach(row=>formedRows += rowForm(row));
             uiElem.tbody.innerHTML = formedRows;
         }
+
         this.clearInput = function(){
             uiElem.input.value = '';
         }
@@ -94,9 +171,11 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 if(tf) {
                     uiElem = tb;
                     this.createAllParts();
-                }
+                    return true;
+                } else return false;
             } else {
                 this.createAllParts();
+                return true;
             }
         }
 
@@ -106,16 +185,51 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 if(i!=undefined)
                     max = Math.max(max, i.length);
             }
-            console.log(attr['column'][parent])
             return attr['column'][parent]?attr['column'][parent].map(x=>`<td${attr['column'][parent].length==1 && max!=0?' colspan="'+max+'"':''}>${x}</td>`):`<td colspan="${max}">No Value</td>`;
         }
 
-        this.createAllParts = function(){
-            let dom = new DOMParser();
-            let div = uiElem.insertAdjacentElement('beforeBegin', document.createElement('div'));
+        this.createSortBtnsPart = function(){
+            let sortBtnsWrap = document.createElement('div');
+            let sort = document.createElement('button');
+            let reverse = document.createElement('button');
+            let clear = document.createElement('button');
+            let hide = document.createElement('button');
+
+            Object.assign(sortBtnsWrap,{
+                className: "btns-wrap",
+                type: "button",
+            });
+            Object.assign(sort,{
+                className: "btns-sort",
+                innerText: 'sort',
+                type: "button",
+            });
+            Object.assign(reverse,{
+                className: "btns-reverse",
+                innerText: 'reverse',
+                type: "button",
+            });
+            Object.assign(clear,{
+                className: "btns-clear",
+                innerText: 'clear',
+                type: "button",
+            });
+            Object.assign(hide,{
+                className: "btns-hide",
+                innerText: 'hide',
+                type: "button",
+            });
+
+            sortBtnsWrap.append(sort, reverse, clear, hide);
+
+            return sortBtnsWrap;
+        }
+
+        this.createSeachPart = function(){
             let search = document.createElement('input');
             let searchBtn = document.createElement('button');
             
+
             Object.assign(search,{
                 className: "search-bar",
                 type: "text",
@@ -125,7 +239,12 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 innerText: "search",
                 type: "button",
             });
+            return [search, searchBtn];
+        }
 
+        this.createAllParts = function(){
+            let dom = new DOMParser();
+            let div = uiElem.insertAdjacentElement('beforeBegin', document.createElement('div'));
             let searchWrap = div.cloneNode();
             
             let elements = dom.parseFromString(`
@@ -146,7 +265,8 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                     </tr>
                 </tfoot>
             </table>
-            `, 'text/html').querySelector('table').innerHTML;
+            `, 'text/html')
+            .querySelector('table').innerHTML;
 
             uiElem.innerHTML = `${elements}`;
 
@@ -154,8 +274,10 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             div.append(uiElem);
             div.append(new DOMParser().parseFromString(`<div>
             <input type="text" data-ks-sort="input">
-        </div>`,'text/html').querySelector('div'))
-            searchWrap.prepend(search, searchBtn);
+            </div>`,'text/html').querySelector('div'));
+            
+            div.prepend(this.createSortBtnsPart());
+            searchWrap.prepend(...this.createSeachPart());
             div.prepend(searchWrap);
         }
     }
@@ -175,40 +297,51 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                     ]
                 }
             };
-            this.checkValid(attr);
-            const body = document.body;
-            const wrap = document.querySelector('[data-ks-sort="wrap"]');
-            const search = document.querySelector('.search');
-            const searchBtn = document.querySelector('.searchBtn');
-            const input = document.querySelector('[data-ks-sort="input"]');
-            const tb = document.querySelector('[data-ks-sort="table"]');
-            const thead = document.querySelector('[data-ks-sort="head"]');
-            const tbody = document.querySelector('[data-ks-sort="body"]');
-            const tfoot = document.querySelector('[data-ks-sort="foot"]');
-            
-            const ui = {
-                body,
-                wrap,
-                search,
-                searchBtn,
-                input,
-                tb,
-                thead,
-                tbody,
-                tfoot,
+            if(this.checkValid(attr)){
+                const body = document.body;
+                const wrap = document.querySelector('[data-ks-sort="wrap"]');
+                const search = document.querySelector('.search');
+                const searchBtn = document.querySelector('.searchBtn');
+                const input = document.querySelector('[data-ks-sort="input"]');
+                const tb = document.querySelector('[data-ks-sort="table"]');
+                const thead = document.querySelector('[data-ks-sort="head"]');
+                const tbody = document.querySelector('[data-ks-sort="body"]');
+                const tfoot = document.querySelector('[data-ks-sort="foot"]');
+                const sortBtnsWrap = document.querySelector('.btns-wrap');
+                const sort = document.querySelector('.btns-sort');
+                const reverse = document.querySelector('.btns-reverse');
+                const clear = document.querySelector('.btns-clear');
+                const hide = document.querySelector('.btns-hide');
+                
+                const ui = {
+                    body,
+                    wrap,
+                    search,
+                    searchBtn,
+                    input,
+                    tb,
+                    thead,
+                    tbody,
+                    tfoot,
+                    sortBtnsWrap,
+                    sort,
+                    reverse,
+                    clear,
+                    hide,
+                }
+    
+                const view = new View();
+                const model = new Model();
+                const controller = new Controller();
+    
+                view.init(ui);
+                model.init(view);
+                controller.init(model, ui);
             }
-
-            const view = new View();
-            const model = new Model();
-            const controller = new Controller();
-
-            view.init(ui);
-            model.init(view);
-            controller.init(model, ui);
         },
         checkValid: function(attributes){
             const gt = new Generator();
-            gt.init(attributes);
+            return gt.init(attributes);
         }
 
     }
