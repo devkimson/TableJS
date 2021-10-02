@@ -40,7 +40,6 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
     function Model(){
         let moduleView = null;
         let rows = null;
-        let idx = 0;
 
         this.init = function(view){
             moduleView = view;
@@ -135,7 +134,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             let reverse = false;
             let formedRows = '';
             let id = 1;
-            if(rows[0].idx>rows[rows.length-1].idx){
+            if(rows.length>0 && rows[0].idx>rows[rows.length-1].idx){
                 reverse = true;
                 id = rows.length;
             }
