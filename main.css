@@ -1,7 +1,11 @@
-[data-ks-sort="tr"]{
-    transition: 1s;
-    -webkit-transition: 1s;
-    -moz-transition: 1s;
-    -ms-transition: 1s;
-    -o-transition: 1s;
+[data-ks-sort="head"],
+[data-ks-sort="body"],
+[data-ks-sort="foot"],
+[data-ks-sort="tr"],
+[data-ks-sort="td"] {
+    transition: 1s 1s;
+    -webkit-transition: 1s 1s;
+    -moz-transition: 1s 1s;
+    -ms-transition: 1s 1s;
+    -o-transition: 1s 1s;
 }

@@ -6,21 +6,47 @@ if(!ks.sort) ks.sort = {};
 if(!ks.sort.editor) ks.sort.editor = (function(){
 
     function Controller(){
-        this.init = function(){
+        let moduleModel = null;
+        let uiElem = null;
+        this.init = function(model, ui){
+            moduleModel = model;
+            uiElem = ui;
+            
+            uiElem.input.addEventListener('keydown', this.addRow);
+        }
 
+        this.addRow = function(ev){
+            moduleModel.addRow(ev);
         }
     }
     function Model(){
         let moduleView = null;
-        let row = [];
+        let rows = [];
 
         this.init = function(view){
             moduleView = view;
 
         }
+        
+        this.addRow = function(ev){
+            // 보류
+            // let rowForm = (row) => {
+            //     idx++;
+            //     return {
+            //         idx: idx,
+            //         row: row
+            //     }
+            // };
+            let target = ev.target;
+            if(ev.key === 'Enter'){
+                rows.push(target.value);
+                moduleView.clearInput();
+                this.updateTable();
+            }
+        }
 
-        this.RowForm = function(){
-            // this.
+        this.updateTable = function(){
+            moduleView.updateTable(rows);
         }
 
         this.sortedRows = function(){
@@ -29,9 +55,27 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
     }
     function View(){
         let uiElem = null;
+
         this.init = function(ui){
             uiElem = ui;
             // console.log(uiElem)
+        }
+        this.updateTable = function(rows){
+            let formedRows = '';
+            let rowForm = row => `
+                    <tr data-ks-sort="tr">
+                        <td data-ks-sort="index">${row.idx+1}</td>
+                        <td>${row.row}</td>
+                        <td><span class="del-btn">&times;</span></td>
+                    </tr>
+            `;
+            rows.forEach((row, idx)=>{
+                formedRows += rowForm({row, idx});
+            });
+            uiElem.tbody.innerHTML = formedRows;
+        }
+        this.clearInput = function(){
+            uiElem.input.value = '';
         }
     }
 
@@ -59,9 +103,11 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
         this.generateTd = function(parent){
             let max = 0;
             for(let i of Object.values(attr['column'])){
-                max = Math.max(max, i.length);
+                if(i!=undefined)
+                    max = Math.max(max, i.length);
             }
-            return attr['column'][parent]?attr['column'][parent].map(x=>`<td${attr['column'][parent].length==1 && max!=0?' colspan="'+max+'"':''}>${x}</td>`):'<td>No Value</td>';
+            console.log(attr['column'][parent])
+            return attr['column'][parent]?attr['column'][parent].map(x=>`<td${attr['column'][parent].length==1 && max!=0?' colspan="'+max+'"':''}>${x}</td>`):`<td colspan="${max}">No Value</td>`;
         }
 
         this.createAllParts = function(){
@@ -91,7 +137,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 </thead>
                 <tbody data-ks-sort="body">
                     <tr>
-                        <td>No Contents.</td>
+                        ${this.generateTd('body')}
                     </tr>
                 </tbody>
                 <tfoot data-ks-sort="foot">
@@ -102,10 +148,13 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             </table>
             `, 'text/html').querySelector('table').innerHTML;
 
-            uiElem.innerHTML = elements;
+            uiElem.innerHTML = `${elements}`;
 
             div.dataset.ksSort = 'wrap';
             div.append(uiElem);
+            div.append(new DOMParser().parseFromString(`<div>
+            <input type="text" data-ks-sort="input">
+        </div>`,'text/html').querySelector('div'))
             searchWrap.prepend(search, searchBtn);
             div.prepend(searchWrap);
         }
@@ -119,7 +168,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                     head: [
                         "구분",
                         "내용",
-                        "값"
+                        "비고"
                     ],
                     foot: [
                         "made by kimson"
@@ -131,14 +180,22 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             const wrap = document.querySelector('[data-ks-sort="wrap"]');
             const search = document.querySelector('.search');
             const searchBtn = document.querySelector('.searchBtn');
+            const input = document.querySelector('[data-ks-sort="input"]');
             const tb = document.querySelector('[data-ks-sort="table"]');
+            const thead = document.querySelector('[data-ks-sort="head"]');
+            const tbody = document.querySelector('[data-ks-sort="body"]');
+            const tfoot = document.querySelector('[data-ks-sort="foot"]');
             
             const ui = {
                 body,
                 wrap,
                 search,
                 searchBtn,
+                input,
                 tb,
+                thead,
+                tbody,
+                tfoot,
             }
 
             const view = new View();
