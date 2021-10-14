@@ -104,7 +104,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 rows.forEach(x=>{
                     max = x.idx>max?x.idx:max;
                 });
-                return {idx: max+1, row: row, regdate: new Date().getTime()}
+                return {idx: max+1, row: row.trim(), regdate: new Date().getTime()}
             };
             let target = ev.target;
 
@@ -168,6 +168,10 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
 
     function View(){
         let uiElem = null;
+        const f = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+        const m = ['ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ', 'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ'];
+        const l = ['', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ', 'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
 
         this.init = function(ui){
             uiElem = ui;
@@ -177,9 +181,29 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             let value = ev.target.value;
             let search = rows;
             if(value.length>0){
-                search = rows.filter(x=>x.row.indexOf(value)>-1);
+                search = rows.filter(x=>{
+                    // console.log();
+                    return this.getSeparate(x.row).indexOf(value)>-1 || x.row.indexOf(value)>-1;
+                });
             }
             this.updateTable(search);
+        }
+
+        this.getSeparate = function(data){
+            let ref = [];
+            data.split('').forEach(x=>{
+                if(x.charCodeAt()-44032<0){
+                    ref.push(x);
+                } else {
+                    let math = x.charCodeAt()-44032;
+                    let ft = Math.floor(math/588);
+                    let mt = Math.floor((math-(ft*588))/28);
+                    let lt = Math.floor(math%28);
+                    ref.push([f[ft],m[mt],l[lt]]);
+                }
+            });
+            // console.log()
+            return ref.join().replace(/\,/gm,'');
         }
 
         this.updateTable = function(rows){
@@ -196,16 +220,21 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                     <tr data-ks-sort="tr" ${rows[rows.length-1]==row?"class='select'":""}>
                         <td data-ks-sort="index" data-ks-sort-idx="${row.idx}">${reverse?id--:id++}</td>
                         <td>${row.row}</td>
+                        <td>
+                            tags
+                        </td>
                         <td data-ks-sort="time">
                             <time>
-                                ${new Date(row.regdate).format("yyyy-MM-dd HH:mm:ss")}
+                                ${row.regdate!=0?new Date(row.regdate).format("yyyy-MM-dd HH:mm:ss"):''}
                             </time>
                         </td>
-                        <td><span class="del-btn ks-sort">&times;</span></td>
+                        <td>${row.regdate!=0?'<span class="del-btn ks-sort">&times;</span>':''}</td>
                     </tr>
             `;
-
             rows.forEach(row=>formedRows += rowForm(row));
+            if(rows.length==0){
+                formedRows += rowForm({idx:1, row:'매치되는 테이블이 없습니다.', regdate: 0});
+            }
             uiElem.tbody.innerHTML = formedRows;
         }
 
@@ -234,11 +263,11 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 
                 if(tf) {
                     uiElem = tb;
-                    this.createAllParts();
+                    this.createAllParts(attributes);
                     return true;
                 } else return false;
             } else {
-                this.createAllParts();
+                this.createAllParts(attributes);
                 return true;
             }
         }
@@ -258,6 +287,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 if(i!=undefined)
                     max = Math.max(max, i.length);
             }
+
             return attr['column'][parent]?attr['column'][parent].map(x=>`<td${attr['column'][parent].length==1 && max!=0?' colspan="'+max+'"':''}>${x}</td>`):`<td colspan="${max}">No Value</td>`;
         }
 
@@ -293,29 +323,34 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 type: "button",
             });
 
-            sortBtnsWrap.append(sort, reverse, clear, hide);
+            sortBtnsWrap.append(sort, reverse, clear);
 
             return sortBtnsWrap;
         }
 
-        this.createSeachPart = function(){
+        this.createSeachPart = function(attributes){
             let search = document.createElement('input');
             let searchBtn = document.createElement('button');
-            
 
             Object.assign(search,{
                 className: "search-bar ks-sort",
                 type: "text",
             });
+
             Object.assign(searchBtn,{
                 className: "search-btn ks-sort ks-sort-main",
                 innerText: "search",
                 type: "button",
             });
-            return [search, searchBtn];
+            if(attributes.search.options){
+                Object.entries(attributes.search.options).forEach(item=>{
+                    search[item[0]] = item[1];
+                });
+            }
+            return attributes.need.map(x => eval(x));
         }
 
-        this.createAllParts = function(){
+        this.createAllParts = function(attributes){
             let dom = new DOMParser();
             let div = uiElem.insertAdjacentElement('beforeBegin', document.createElement('div'));
             let searchWrap = div.cloneNode();
@@ -336,7 +371,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                         ${this.generateTd('foot')}
                     </tr>
                     <tr data-ks-sort="tr">
-                        <td>
+                        <td colspan="${attributes.column.head.length}">
                             <input id="readonly" type="checkbox" class="readonly ks-sort">
                             <label for="readonly">readonly</label>
                         </td>
@@ -355,7 +390,7 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
             </div>`,'text/html').querySelector('div'));
             
             div.prepend(this.createSortBtnsPart());
-            searchWrap.prepend(...this.createSeachPart());
+            searchWrap.prepend(...this.createSeachPart(attributes));
             searchWrap.classList.add("search-wrap");
             div.prepend(searchWrap);
         }
@@ -364,11 +399,13 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
     return {
 
         init: function(attributes){
-            const attr = attributes || {
+            const attr = attributes || { };
+            Object.assign(attr,{
                 column: {
                     head: [
                         "구분",
                         "내용",
+                        "태그",
                         "생성시간",
                         "비고"
                     ],
@@ -376,7 +413,8 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                         "made by kimson"
                     ]
                 }
-            };
+            });
+            
             if(this.checkValid(attr)){
                 const body = document.body;
                 const wrap = document.querySelector('[data-ks-sort="wrap"]');
@@ -397,8 +435,6 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                 const ui = {
                     body,
                     wrap,
-                    search,
-                    searchBtn,
                     input,
                     tb,
                     thead,
@@ -411,7 +447,9 @@ if(!ks.sort.editor) ks.sort.editor = (function(){
                     hide,
                     readonly,
                 }
-    
+                attr.need.forEach(need=>{
+                    ui[need] = eval(need);
+                });
                 const view = new View();
                 const model = new Model();
                 const controller = new Controller();
